@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>内部图书共享 | 赠书换书平台</title>
+    <!-- 完全本地内置样式，无任何外网依赖 -->
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{background-color:#FAF8F5;color:#3D2914;font-family:PingFang SC,Microsoft YaHei,sans-serif;font-size:14px;}
+        .container{max-width:1200px;margin:0 auto;padding:0 16px;}
+        /* 导航栏 */
+        header{background:#fff;border-bottom:1px solid #E8E0D5;position:sticky;top:0;z:50;}
+        .nav-wrap{display:flex;align-items:center;justify-content:space-between;height:64px;}
+        .logo{font-size:20px;font-weight:500;color:#5D3A1A;text-decoration:none;}
+        .nav-list{display:flex;gap:32px;list-style:none;}
+        .nav-list a{text-decoration:none;color:#8B5A2B;transition:0.25s;}
+        .nav-list a.active,.nav-list a:hover{color:#5D3A1A;}
+        .search-box{position:relative;}
+        .search-box input{width:192px;height:32px;background:#FAF8F5;border:0;border-radius:6px;padding:0 12px;outline:none;color:#3D2914;border:1px solid #E8E0D5;}
+        .lang-select,.city-select,.user-input{padding:6px 12px;background:#FAF8F5;border:1px solid #E8E0D5;border-radius:6px;color:#8B5A2B;cursor:pointer;outline:none;font-size:14px;}
+        .lang-select:hover,.city-select:hover{border-color:#8B5A2B;}
+        .user-input{cursor:text;width:100px;}
+        .user-input:focus{border-color:#8B5A2B;}
+        .book-card{transition:all 0.3s ease;animation:fadeIn 0.5s ease;}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+        .book-cover{width:100%;aspect-ratio:3/4;background:linear-gradient(135deg,#8B5A2B,#5D3A1A);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;border-radius:4px 4px 0 0;position:relative;overflow:hidden;}
+        .book-cover img{width:100%;height:100%;object-fit:cover;}
+        .book-cover .placeholder-icon{font-size:40px;opacity:0.5;}
+        .city-tag{position:absolute;top:8px;left:8px;background:rgba(255,255,255,0.95);color:#5D3A1A;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:500;box-shadow:0 2px 6px rgba(0,0,0,0.15);}
+        .city-label{display:inline-flex;align-items:center;gap:4px;background:#5D3A1A;color:#fff;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:500;margin-top:8px;}
+        .badge{display:inline-block;padding:2px 8px;background:#FAF8F5;color:#8B5A2B;border-radius:10px;font-size:11px;margin-top:4px;}
+        .toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#5D3A1A;color:#fff;padding:12px 24px;border-radius:6px;z-index:9999;animation:slideDown 0.3s ease;}
+        @keyframes slideDown{from{opacity:0;transform:translate(-50%,-20px);}to{opacity:1;transform:translate(-50%,0);}}
+        /* 通用卡片 */
+        .card{background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);}
+        .card-hover{transition:all 0.25s ease;}
+        .card-hover:hover{transform:translateY(-4px);box-shadow:0 8px 20px rgba(0,0,0,0.08);}
+        /* 首页横幅 */
+        .banner{padding:32px;margin:24px 0;}
+        .banner h2{font-size:24px;font-weight:500;margin-bottom:12px;}
+        .banner p{color:#888;line-height:1.8;max-width:700px;margin-bottom:20px;}
+        .btn-primary{display:inline-block;padding:8px 20px;background:#8B5A2B;color:#fff;border-radius:6px;text-decoration:none;transition:0.25s;border:0;cursor:pointer;}
+        .btn-primary:hover{background:#5D3A1A;}
+        /* 分类筛选 */
+        .cate-list{display:flex;flex-wrap:wrap;gap:12px;margin:32px 0;}
+        .cate-list button{padding:8px 16px;border-radius:20px;border:0;cursor:pointer;transition:0.25s;}
+        .cate-list button.active{background:#8B5A2B;color:#fff;}
+        .cate-list button:not(.active){background:#fff;color:#8B5A2B;border:1px solid #E8E0D5;}
+        .cate-list button:not(.active):hover{color:#5D3A1A;border-color:#8B5A2B;}
+        /* 图书列表 */
+        .section-title{display:flex;align-items:center;font-size:18px;font-weight:500;margin:24px 0;}
+        .section-title .line{width:4px;height:16px;background:#8B5A2B;border-radius:2px;margin-right:8px;}
+        .book-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:24px;margin-bottom:48px;}
+        .empty-tips{grid-column:1/-1;text-align:center;padding:60px 0;color:#8B5A2B;}
+        .book-card{overflow:hidden;}
+        .book-img{width:100%;aspect-ratio:3/4;background:#FAF8F5;display:flex;align-items:center;justify-content:center;color:#8B5A2B;font-size:12px;}
+        .book-info{padding:12px;}
+        .book-name{font-size:14px;font-weight:500;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .book-desc{font-size:12px;color:#8B5A2B;line-height:1.6;margin-bottom:4px;}
+        .btn-book{width:100%;padding:6px 0;margin-top:8px;border:1px solid #8B5A2B;color:#8B5A2B;background:transparent;border-radius:6px;cursor:pointer;transition:0.25s;font-size:12px;}
+        .btn-book:hover{background:#8B5A2B;color:#fff;}
+        .btn-edit{width:100%;padding:6px 0;margin-top:6px;border:1px solid #5D3A1A;color:#5D3A1A;background:transparent;border-radius:6px;cursor:pointer;transition:0.25s;font-size:12px;}
+        .btn-edit:hover{background:#5D3A1A;color:#fff;}
+        .btn-delete{width:100%;padding:6px 0;margin-top:6px;border:1px solid #c0392b;color:#c0392b;background:transparent;border-radius:6px;cursor:pointer;transition:0.25s;font-size:12px;}
+        .btn-delete:hover{background:#c0392b;color:#fff;}
+        .book-actions{display:flex;gap:8px;}
+        .book-actions button{flex:1;}
+        .edit-modal-box{background:#fff;border-radius:8px;padding:24px;width:100%;max-width:500px;max-height:80vh;overflow-y:auto;}
+        .edit-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;}
+        .edit-form-item{display:flex;flex-direction:column;gap:6px;}
+        .edit-form-item.full{grid-column:1/-1;}
+        .edit-form-item label{font-size:14px;color:#3D2914;}
+        .edit-form-item input,.edit-form-item select,.edit-form-item textarea{padding:10px;background:#FAF8F5;border:1px solid #E8E0D5;border-radius:6px;outline:none;font-size:14px;color:#3D2914;}
+        .edit-form-item input:focus,.edit-form-item select:focus,.edit-form-item textarea:focus{border-color:#8B5A2B;}
+        .edit-upload-box{border:1px dashed #E8E0D5;border-radius:6px;padding:20px;text-align:center;color:#8B5A2B;cursor:pointer;}
+        .edit-upload-box:hover{border-color:#8B5A2B;}
+        .edit-preview-img{max-width:100%;max-height:120px;border-radius:4px;margin-top:8px;display:none;}
+        /* 表单板块 */
+        .form-wrap{padding:32px;margin-bottom:48px;}
+        .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+        .form-item{display:flex;flex-direction:column;gap:8px;}
+        .form-item.full{grid-column:1/-1;}
+        .form-item label{font-size:14px;color:#3D2914;}
+        .form-item input,.form-item select,.form-item textarea{padding:12px;background:#FAF8F5;border:1px solid #E8E0D5;border-radius:6px;outline:none;font-size:14px;color:#3D2914;}
+        .upload-box{border:1px dashed #E8E0D5;border-radius:6px;padding:32px;text-align:center;color:#8B5A2B;}
+        /* 个人中心 */
+        .mine-wrap{padding:32px;margin-bottom:48px;}
+        .mine-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+        .mine-item{padding:16px;background:#FAF8F5;border-radius:6px;border:1px solid #E8E0D5;}
+        .mine-item .tit{color:#8B5A2B;font-size:14px;margin-bottom:8px;}
+        .mine-item .num{font-size:20px;font-weight:500;color:#5D3A1A;}
+        .mine-item .link{font-size:12px;color:#8B5A2B;text-decoration:none;margin-top:8px;display:inline-block;}
+        .mine-item.clickable{cursor:pointer;transition:0.25s;}
+        .mine-item.clickable:hover{background:#F5EFE6;transform:translateY(-2px);box-shadow:0 4px 12px rgba(139,90,43,0.15);}
+        .mine-item.active{background:#5D3A1A;color:#fff;}
+        .mine-item.active .tit,.mine-item.active .num,.mine-item.active .link{color:#fff;}
+        .filter-toolbar{display:none;align-items:center;gap:12px;margin-bottom:20px;padding:12px 16px;background:#F5EFE6;border-radius:8px;border:1px solid #E8E0D5;}
+        .filter-toolbar.show{display:flex;}
+        .filter-toolbar .filter-title{font-size:14px;color:#5D3A1A;font-weight:500;}
+        .filter-toolbar .filter-count{font-size:13px;color:#8B5A2B;}
+        .filter-toolbar .btn-back{margin-left:auto;padding:6px 14px;background:#fff;border:1px solid #8B5A2B;color:#8B5A2B;border-radius:6px;cursor:pointer;font-size:13px;transition:0.25s;}
+        .filter-toolbar .btn-back:hover{background:#8B5A2B;color:#fff;}
+        /* 规则板块 */
+        .rule-wrap{padding:32px;margin-bottom:48px;}
+        .rule-wrap p{line-height:1.8;color:#3D2914;margin-bottom:12px;}
+        /* 页脚 */
+        footer{text-align:center;padding:24px 0;color:#8B5A2B;font-size:12px;border-top:1px solid #E8E0D5;}
+        /* 弹窗 */
+        .modal{position:fixed;inset:0;background:rgba(0,0,0,0.3);display:none;align-items:center;justify-content:center;z:999;}
+        .modal.show{display:flex;}
+        .modal-box{background:#fff;border-radius:8px;padding:24px;width:100%;max-width:400px;}
+        .modal-title{font-size:16px;font-weight:500;margin-bottom:16px;}
+        .modal-desc{color:#8B5A2B;font-size:14px;margin-bottom:24px;line-height:1.8;}
+        .modal-btn{display:flex;justify-content:flex-end;gap:16px;}
+        .btn-cancel{padding:8px 16px;border:1px solid #E8E0D5;background:#fff;border-radius:6px;cursor:pointer;color:#3D2914;}
+        .btn-confirm{padding:8px 16px;background:#8B5A2B;color:#fff;border-radius:6px;border:0;cursor:pointer;}
+        /* 适配手机 */
+        @media (max-width:768px){
+            .book-grid{grid-template-columns:repeat(2,1fr);}
+            .form-grid{grid-template-columns:1fr;}
+            .mine-grid{grid-template-columns:1fr;}
+            .nav-list{display:none;}
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <header>
+        <div class="container nav-wrap">
+            <a href="#" class="logo">内部图书共享平台</a>
+            <ul class="nav-list">
+                <li><a href="#home" class="active">首页</a></li>
+                <li><a href="#bookList">全部书单</a></li>
+                <li><a href="#publish">我要捐书</a></li>
+                <li><a href="#mine">个人中心</a></li>
+                <li><a href="#rule">平台规则</a></li>
+            </ul>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <input type="text" class="user-input" id="userName" placeholder="你的昵称" onchange="saveUserName()" title="设置你的昵称">
+                <input type="email" class="user-input" id="userEmail" placeholder="公司邮箱" onchange="saveUserEmail()" title="设置你的公司邮箱" style="width:180px;">
+                <select class="city-select" id="citySelect">
+                    <option value="">选择城市</option>
+                    <option value="beijing">北京</option>
+                    <option value="shanghai">上海</option>
+                    <option value="suzhou">苏州</option>
+                    <option value="guangzhou">广州</option>
+                    <option value="chengdu">成都</option>
+                    <option value="shenzhen">深圳</option>
+                </select>
+                <select class="lang-select" id="langSelect">
+                    <option value="zh">中文</option>
+                    <option value="en">English</option>
+                </select>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="搜索书名/作者" oninput="handleSearch()">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- 首页横幅 -->
+        <section id="home" class="card banner">
+            <h2>闲置图书 · 内部共享</h2>
+            <p>将闲置书籍赠与同事，以书会友，循环共享知识。申领书籍后，系统将自动向发布者发送邮件提醒，双方线下自主对接交接。</p>
+            <a href="#publish" class="btn-primary">立即捐书上架</a>
+        </section>
+
+        <!-- 分类筛选 -->
+        <section class="cate-list" id="cateList">
+            <button class="active" data-category="">全部书籍</button>
+            <button data-category="职场成长">职场成长</button>
+            <button data-category="文学小说">文学小说</button>
+            <button data-category="社科历史">社科历史</button>
+            <button data-category="育儿生活">育儿生活</button>
+            <button data-category="工具技能">工具技能</button>
+        </section>
+
+        <!-- 图书列表 -->
+        <section id="bookList">
+            <h3 class="section-title"><span class="line"></span>最新上架书籍</h3>
+            <div class="filter-toolbar" id="filterToolbar">
+                <span class="filter-title" id="filterTitle">我的书籍</span>
+                <span class="filter-count" id="filterCount"></span>
+                <button class="btn-back" onclick="clearFilter()">返回全部书籍</button>
+            </div>
+            <div class="book-grid" id="bookGrid">
+                <div class="empty-tips" id="emptyTips">暂无上架图书，快去发布闲置书籍吧</div>
+            </div>
+        </section>
+
+        <!-- 捐书发布 -->
+        <section id="publish" class="card form-wrap">
+            <h3 class="section-title"><span class="line"></span>我要发布闲置书籍</h3>
+            <div class="form-grid">
+                <div class="form-item">
+                    <label>书籍名称 <span style="color:red">*</span></label>
+                    <input type="text" id="bookName" placeholder="请输入书名">
+                </div>
+                <div class="form-item">
+                    <label>作者 <span style="color:red">*</span></label>
+                    <input type="text" id="bookAuthor" placeholder="请输入作者名称">
+                </div>
+                <div class="form-item">
+                    <label>书籍分类 <span style="color:red">*</span></label>
+                    <select id="bookCategory">
+                        <option value="">请选择分类</option>
+                        <option value="职场成长">职场成长</option>
+                        <option value="文学小说">文学小说</option>
+                        <option value="社科历史">社科历史</option>
+                        <option value="育儿生活">育儿生活</option>
+                        <option value="工具技能">工具技能</option>
+                    </select>
+                </div>
+                <div class="form-item">
+                    <label>所在城市 <span style="color:red">*</span></label>
+                    <select id="bookCity">
+                        <option value="">请选择城市</option>
+                        <option value="北京">北京</option>
+                        <option value="上海">上海</option>
+                        <option value="苏州">苏州</option>
+                        <option value="广州">广州</option>
+                        <option value="成都">成都</option>
+                        <option value="深圳">深圳</option>
+                    </select>
+                </div>
+                <div class="form-item">
+                    <label>书籍品相</label>
+                    <select id="bookCondition">
+                        <option value="全新未翻阅">全新未翻阅</option>
+                        <option value="九成新">九成新（轻微翻阅）</option>
+                        <option value="八成新">八成新（少量笔记）</option>
+                        <option value="七成新">七成新（正常磨损）</option>
+                    </select>
+                </div>
+                <div class="form-item full">
+                    <label>书籍简介/赠书说明</label>
+                    <textarea id="bookDesc" rows="4" placeholder="简单介绍书籍内容、阅读感受或赠书须知"></textarea>
+                </div>
+                <div class="form-item full">
+                    <label>上传书籍实拍图</label>
+                    <div class="upload-box" onclick="document.getElementById('bookImage').click()">点击或拖拽图片至此上传</div>
+                    <input type="file" id="bookImage" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
+                </div>
+                <div class="form-item full">
+                    <button class="btn-primary" onclick="submitBook()">提交上架</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 个人中心 -->
+        <section id="mine" class="card mine-wrap">
+            <h3 class="section-title"><span class="line"></span>个人中心</h3>
+            <div class="mine-grid">
+                <div class="mine-item clickable" data-filter="published" onclick="filterMyBooks('published', this)">
+                    <p class="tit">我发布的书籍</p>
+                    <p class="num" id="myPublishedCount">0 本</p>
+                    <span class="link">查看全部 ></span>
+                </div>
+                <div class="mine-item clickable" data-filter="requested" onclick="filterMyBooks('requested', this)">
+                    <p class="tit">我申领的书籍</p>
+                    <p class="num" id="myRequestedCount">0 本</p>
+                    <span class="link">查看记录 ></span>
+                </div>
+                <div class="mine-item clickable" data-filter="pending" onclick="filterMyBooks('pending', this)">
+                    <p class="tit">待对接书籍</p>
+                    <p class="num" id="pendingCount">0 本</p>
+                    <span class="link">查看消息 ></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 平台规则 -->
+        <section id="rule" class="card rule-wrap">
+            <h3 class="section-title"><span class="line"></span>平台使用规则</h3>
+            <p>1、本平台为公司内部员工专属公益图书共享平台，所有书籍均为免费赠与、无交易、无收费。</p>
+            <p>2、员工可自主上架个人闲置正版书籍，如实填写书籍品相与信息，禁止上架盗版、破损严重、非正规书籍。</p>
+            <p>3、申领书籍后，系统将自动向书籍发布者发送邮件通知，双方请及时线下对接，完成书籍交接。</p>
+            <p>4、请文明共享、诚信申领，申领书籍后请勿无故弃领，珍惜同事分享的书籍资源。</p>
+            <p>5、平台仅提供展示与通知服务，书籍交接、阅读使用由双方自主沟通负责。</p>
+        </section>
+    </main>
+
+    <footer class="container">
+        内部图书共享平台 © 2026 仅供公司内部员工交流使用
+    </footer>
+
+    <!-- 申领弹窗 -->
+    <div id="applyModal" class="modal">
+        <div class="modal-box">
+            <h4 class="modal-title" id="modalTitle">申领书籍</h4>
+            <div id="applyBookInfo" style="margin-bottom:12px;"></div>
+            <p class="modal-desc" id="modalDesc"></p>
+            <div class="modal-btn">
+                <button class="btn-cancel" onclick="hideApplyModal()">取消</button>
+                <button class="btn-confirm" onclick="submitApply()">确认申领，发送邮件通知</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑弹窗 -->
+    <div id="editModal" class="modal">
+        <div class="edit-modal-box">
+            <h4 class="modal-title">编辑书籍信息</h4>
+            <div class="edit-form-grid">
+                <div class="edit-form-item">
+                    <label>书籍名称 <span style="color:red">*</span></label>
+                    <input type="text" id="editBookName" placeholder="请输入书名">
+                </div>
+                <div class="edit-form-item">
+                    <label>作者 <span style="color:red">*</span></label>
+                    <input type="text" id="editBookAuthor" placeholder="请输入作者名称">
+                </div>
+                <div class="edit-form-item">
+                    <label>书籍分类 <span style="color:red">*</span></label>
+                    <select id="editBookCategory">
+                        <option value="">请选择分类</option>
+                        <option value="职场成长">职场成长</option>
+                        <option value="文学小说">文学小说</option>
+                        <option value="社科历史">社科历史</option>
+                        <option value="育儿生活">育儿生活</option>
+                        <option value="工具技能">工具技能</option>
+                    </select>
+                </div>
+                <div class="edit-form-item">
+                    <label>所在城市 <span style="color:red">*</span></label>
+                    <select id="editBookCity">
+                        <option value="">请选择城市</option>
+                        <option value="北京">北京</option>
+                        <option value="上海">上海</option>
+                        <option value="苏州">苏州</option>
+                        <option value="广州">广州</option>
+                        <option value="成都">成都</option>
+                        <option value="深圳">深圳</option>
+                    </select>
+                </div>
+                <div class="edit-form-item">
+                    <label>书籍品相</label>
+                    <select id="editBookCondition">
+                        <option value="全新未翻阅">全新未翻阅</option>
+                        <option value="九成新">九成新（轻微翻阅）</option>
+                        <option value="八成新">八成新（少量笔记）</option>
+                        <option value="七成新">七成新（正常磨损）</option>
+                    </select>
+                </div>
+                <div class="edit-form-item full">
+                    <label>书籍简介/赠书说明</label>
+                    <textarea id="editBookDesc" rows="3" placeholder="简单介绍书籍内容、阅读感受或赠书须知"></textarea>
+                </div>
+                <div class="edit-form-item full">
+                    <label>上传书籍实拍图</label>
+                    <div class="edit-upload-box" onclick="document.getElementById('editBookImage').click()">点击或拖拽图片至此上传</div>
+                    <input type="file" id="editBookImage" accept="image/*" style="display:none" onchange="handleEditImageUpload(event)">
+                    <img id="editPreviewImg" class="edit-preview-img" alt="预览">
+                </div>
+            </div>
+            <div class="modal-btn" style="margin-top:20px;">
+                <button class="btn-cancel" onclick="hideEditModal()">取消</button>
+                <button class="btn-confirm" onclick="submitEdit()">保存修改</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let nowBookName = '';
+        let nowPublisher = '';
+        let currentCategory = '';
+        let currentImageData = null;
+        let myFilterType = '';
+
+        // ==========================================
+        // Power Automate Webhook 配置
+        // 将下面的URL替换为你在Power Automate中创建的Webhook URL
+        // 创建步骤：Power Automate → 新建流 → 触发器选"When a Teams webhook request is received" → 保存后复制URL
+        // ==========================================
+        const POWER_AUTOMATE_WEBHOOK_URL = 'http://localhost:9090/webhook';
+
+        async function sendNotification(book, requesterName, requesterEmail) {
+            if (POWER_AUTOMATE_WEBHOOK_URL === '在此替换为你的Webhook_URL' || !POWER_AUTOMATE_WEBHOOK_URL) {
+                console.log('[通知] Webhook URL未配置，跳过发送。请在代码中设置 POWER_AUTOMATE_WEBHOOK_URL。');
+                return { success: false, reason: 'not_configured' };
+            }
+
+            const payload = {
+                bookName: book.name || '',
+                bookAuthor: book.author || '',
+                bookCategory: book.category || '',
+                bookCity: book.city || '未知',
+                bookCondition: book.condition || '',
+                bookDesc: book.desc || '',
+                publisher: book.publisher || '',
+                publisherEmail: book.publisherEmail || '',
+                requester: requesterName || '',
+                requesterEmail: requesterEmail || '',
+                requestedAt: new Date().toLocaleString('zh-CN'),
+                action: 'book_requested'
+            };
+
+            try {
+                const response = await fetch(POWER_AUTOMATE_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok || response.status === 202) {
+                    console.log('[通知] Webhook发送成功');
+                    return { success: true };
+                } else {
+                    console.log('[通知] Webhook返回状态码:', response.status);
+                    return { success: false, reason: 'http_error', status: response.status };
+                }
+            } catch (error) {
+                console.log('[通知] Webhook发送失败:', error.message);
+                return { success: false, reason: 'fetch_error', error: error.message };
+            }
+        }
+
+        function getBooks() {
+            return JSON.parse(localStorage.getItem('books') || '[]');
+        }
+
+        function saveBooks(books) {
+            localStorage.setItem('books', JSON.stringify(books));
+        }
+
+        function getCurrentUser() {
+            return localStorage.getItem('userName') || '匿名用户';
+        }
+
+        function getCurrentUserEmail() {
+            return localStorage.getItem('userEmail') || '';
+        }
+
+        function saveUserName() {
+            const name = document.getElementById('userName').value.trim();
+            if (name) {
+                localStorage.setItem('userName', name);
+                showToast('昵称已保存');
+            }
+        }
+
+        function saveUserEmail() {
+            const email = document.getElementById('userEmail').value.trim();
+            if (email) {
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    showToast('请输入有效的邮箱地址');
+                    return;
+                }
+                localStorage.setItem('userEmail', email);
+                showToast('邮箱已保存');
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerText = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    currentImageData = e.target.result;
+                    showToast('图片已上传');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function submitBook() {
+            const name = document.getElementById('bookName').value.trim();
+            const author = document.getElementById('bookAuthor').value.trim();
+            const category = document.getElementById('bookCategory').value;
+            const city = document.getElementById('bookCity').value;
+            const condition = document.getElementById('bookCondition').value;
+            const desc = document.getElementById('bookDesc').value.trim();
+
+            if (getCurrentUser() === '匿名用户') { showToast('请先设置昵称再发布书籍'); document.getElementById('userName').focus(); return; }
+            if (!getCurrentUserEmail()) { showToast('请先填写公司邮箱再发布书籍'); document.getElementById('userEmail').focus(); return; }
+            if (!name) { showToast('请输入书籍名称'); return; }
+            if (!author) { showToast('请输入作者'); return; }
+            if (!category) { showToast('请选择分类'); return; }
+            if (!city) { showToast('请选择所在城市'); return; }
+
+            const books = getBooks();
+            const newBook = {
+                id: Date.now(),
+                name: name,
+                author: author,
+                category: category,
+                city: city,
+                condition: condition,
+                desc: desc,
+                image: currentImageData,
+                publisher: getCurrentUser(),
+                publisherEmail: getCurrentUserEmail(),
+                publisherCity: city,
+                createdAt: new Date().toLocaleString('zh-CN'),
+                requested: false
+            };
+
+            books.unshift(newBook);
+            saveBooks(books);
+
+            document.getElementById('bookName').value = '';
+            document.getElementById('bookAuthor').value = '';
+            document.getElementById('bookCategory').value = '';
+            document.getElementById('bookCity').value = '';
+            document.getElementById('bookCondition').value = '全新未翻阅';
+            document.getElementById('bookDesc').value = '';
+            document.getElementById('bookImage').value = '';
+            currentImageData = null;
+
+            showToast('书籍上架成功！');
+            renderBooks();
+            updateMyCounts();
+            
+            setTimeout(() => {
+                document.getElementById('bookList').scrollIntoView({ behavior: 'smooth' });
+            }, 500);
+        }
+
+        function filterMyBooks(type, el) {
+            myFilterType = type;
+            const lang = document.getElementById('langSelect').value;
+            
+            document.querySelectorAll('.mine-item').forEach(e => e.classList.remove('active'));
+            if (el) el.classList.add('active');
+            
+            const toolbar = document.getElementById('filterToolbar');
+            toolbar.classList.add('show');
+            
+            const titles = {
+                published: lang === 'zh' ? '我发布的书籍' : 'My Published Books',
+                requested: lang === 'zh' ? '我申领的书籍' : 'My Requested Books',
+                pending: lang === 'zh' ? '待对接书籍' : 'Pending Handover'
+            };
+            document.getElementById('filterTitle').innerText = titles[type];
+            
+            renderBooks();
+            
+            document.getElementById('bookList').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function clearFilter() {
+            myFilterType = '';
+            document.querySelectorAll('.mine-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('filterToolbar').classList.remove('show');
+            document.getElementById('bookList').scrollIntoView({ behavior: 'smooth' });
+            renderBooks();
+        }
+        
+        function renderBooks() {
+            const books = getBooks();
+            const grid = document.getElementById('bookGrid');
+            const searchValue = document.getElementById('searchInput').value.trim().toLowerCase();
+            const currentUser = getCurrentUser();
+            
+            let filtered = books;
+            
+            if (myFilterType) {
+                if (myFilterType === 'published') {
+                    filtered = filtered.filter(b => b.publisher === currentUser);
+                } else if (myFilterType === 'requested') {
+                    filtered = filtered.filter(b => b.requestedBy === currentUser);
+                } else if (myFilterType === 'pending') {
+                    filtered = filtered.filter(b => b.requestedBy === currentUser && !b.completed);
+                }
+                document.getElementById('filterCount').innerText = filtered.length + ' 本';
+            }
+            
+            if (currentCategory) {
+                filtered = filtered.filter(b => b.category === currentCategory);
+            }
+            if (searchValue) {
+                filtered = filtered.filter(b => 
+                    b.name.toLowerCase().includes(searchValue) || 
+                    b.author.toLowerCase().includes(searchValue)
+                );
+            }
+
+            if (filtered.length === 0) {
+                let emptyMsg = '没有找到匹配的书籍';
+                if (books.length === 0) {
+                    emptyMsg = '暂无上架图书，快去发布闲置书籍吧';
+                } else if (myFilterType === 'published') {
+                    emptyMsg = '你还没有发布任何书籍，快去捐书吧';
+                } else if (myFilterType === 'requested') {
+                    emptyMsg = '你还没有申领任何书籍';
+                } else if (myFilterType === 'pending') {
+                    emptyMsg = '暂无待对接的书籍';
+                }
+                grid.innerHTML = `<div class="empty-tips">${emptyMsg}</div>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(book => {
+                const isOwner = book.publisher === getCurrentUser();
+                const isRequester = book.requestedBy === getCurrentUser();
+                const requestedBadge = book.requested ? '<span class="badge" style="background:#c0392b;color:#fff;">已申领</span>' : '';
+
+                let actionButtons = '';
+                if (isOwner) {
+                    actionButtons = `<div class="book-actions">
+                        <button class="btn-edit" onclick="showEditModal(${book.id})">编辑</button>
+                        <button class="btn-delete" onclick="deleteBook(${book.id})">删除</button>
+                       </div>`;
+                    if (book.requested && isRequester) {
+                        actionButtons += `<button class="btn-book" style="background:#c0392b;" onclick="cancelRequest(${book.id})">取消申领</button>`;
+                    }
+                } else {
+                    if (!book.requested) {
+                        actionButtons = `<button class="btn-book" onclick='showApplyModal(${JSON.stringify(book.name).replace(/'/g, "\\'")}, ${JSON.stringify(book.publisher).replace(/'/g, "\\'")}, ${book.id})'>立即申领</button>`;
+                    } else if (isRequester) {
+                        actionButtons = `<button class="btn-book" style="background:#c0392b;" onclick="cancelRequest(${book.id})">取消申领</button>`;
+                    } else {
+                        actionButtons = '<button class="btn-book" disabled style="opacity:0.5;cursor:not-allowed;">已被申领</button>';
+                    }
+                }
+                
+                return `
+                <div class="card book-card card-hover">
+                    <div class="book-cover">
+                        <span class="city-tag">📍 ${escapeHtml(book.city || '未知城市')}</span>
+                        ${book.image 
+                            ? `<img src="${book.image}" alt="${book.name}">` 
+                            : `<span class="placeholder-icon">📚</span>`
+                        }
+                    </div>
+                    <div class="book-info">
+                        <div class="book-name">${escapeHtml(book.name)}</div>
+                        <div class="book-desc">作者：${escapeHtml(book.author)}</div>
+                        <span class="badge">${escapeHtml(book.category)}</span>
+                        <span class="badge">${escapeHtml(book.condition)}</span>
+                        ${requestedBadge}
+                        <span class="city-label">📍 ${escapeHtml(book.city || '未知城市')}</span>
+                        <div class="book-desc" style="margin-top:8px;font-size:11px;color:#8B5A2B;">
+                            发布者：${escapeHtml(book.publisher)}
+                        </div>
+                        ${actionButtons}
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.innerText = text;
+            return div.innerHTML;
+        }
+
+        function handleSearch() {
+            renderBooks();
+        }
+
+        function handleCategoryClick(btn) {
+            document.querySelectorAll('#cateList button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentCategory = btn.dataset.category;
+            if (myFilterType) {
+                clearFilter();
+                return;
+            }
+            renderBooks();
+        }
+
+        function updateMyCounts() {
+            const books = getBooks();
+            const user = getCurrentUser();
+            const myPublished = books.filter(b => b.publisher === user);
+            const myRequested = books.filter(b => b.requestedBy === user);
+            const pending = books.filter(b => b.requestedBy === user && !b.completed);
+
+            document.getElementById('myPublishedCount').innerText = myPublished.length + ' 本';
+            document.getElementById('myRequestedCount').innerText = myRequested.length + ' 本';
+            document.getElementById('pendingCount').innerText = pending.length + ' 本';
+        }
+
+        function showApplyModal(bookName, publisher, bookId) {
+            nowBookName = bookName;
+            nowPublisher = publisher;
+            const lang = document.getElementById('langSelect').value;
+            const trans = translations[lang];
+            const book = getBooks().find(b => b.id === bookId);
+
+            if (book && book.publisher === getCurrentUser()) {
+                showToast(lang === 'zh' ? '不能申领自己发布的书籍' : 'You cannot request your own book');
+                return;
+            }
+
+            if (book && book.requested) {
+                showToast(lang === 'zh' ? '这本书已被申领' : 'This book has already been requested');
+                return;
+            }
+            
+            document.getElementById('modalTitle').innerText = trans.modalTitle.replace('书籍', `《${bookName}》`);
+            document.getElementById('modalDesc').innerText = trans.applyDesc.replace('{publisher}', publisher);
+            
+            const infoEl = document.getElementById('applyBookInfo');
+            if (book) {
+                let infoHtml = '<div style="background:#FAF8F5;border:1px solid #E8E0D5;border-radius:8px;padding:14px;">';
+                if (book.image) {
+                    infoHtml += `<img src="${book.image}" style="width:100%;max-height:160px;object-fit:cover;border-radius:6px;margin-bottom:10px;">`;
+                }
+                infoHtml += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">`;
+                if (book.author) infoHtml += `<span style="font-size:13px;color:#3D2914;">作者：${escapeHtml(book.author)}</span>`;
+                if (book.category) infoHtml += `<span class="badge">${escapeHtml(book.category)}</span>`;
+                if (book.condition) infoHtml += `<span class="badge">${escapeHtml(book.condition)}</span>`;
+                if (book.city) infoHtml += `<span class="city-label">📍 ${escapeHtml(book.city)}</span>`;
+                infoHtml += `</div>`;
+                if (book.desc) {
+                    infoHtml += `<div style="font-size:13px;color:#5D3A1A;line-height:1.6;margin-top:8px;padding-top:8px;border-top:1px dashed #E8E0D5;">`;
+                    infoHtml += `<div style="font-weight:600;margin-bottom:4px;">📖 书籍简介</div>`;
+                    infoHtml += escapeHtml(book.desc);
+                    infoHtml += `</div>`;
+                } else {
+                    infoHtml += `<div style="font-size:13px;color:#999;margin-top:8px;padding-top:8px;border-top:1px dashed #E8E0D5;">发布者未填写书籍简介</div>`;
+                }
+                infoHtml += `<div style="font-size:12px;color:#8B5A2B;margin-top:8px;padding-top:8px;border-top:1px dashed #E8E0D5;">`;
+                infoHtml += `👤 捐书人：${escapeHtml(book.publisher)}`;
+                if (book.publisherEmail) {
+                    infoHtml += ` | 📧 <a href="mailto:${escapeHtml(book.publisherEmail)}" style="color:#8B5A2B;text-decoration:underline;">${escapeHtml(book.publisherEmail)}</a>`;
+                }
+                infoHtml += `</div>`;
+                infoHtml += '</div>';
+                infoEl.innerHTML = infoHtml;
+            } else {
+                infoEl.innerHTML = '';
+            }
+            
+            document.getElementById('applyModal').classList.add('show');
+            
+            window._currentBookId = bookId;
+        }
+
+        function hideApplyModal() {
+            document.getElementById('applyModal').classList.remove('show');
+        }
+
+        async function submitApply() {
+            const lang = document.getElementById('langSelect').value;
+            const trans = translations[lang];
+            const requesterName = getCurrentUser();
+            const requesterEmail = getCurrentUserEmail();
+
+            if (requesterName === '匿名用户') {
+                showToast(lang === 'zh' ? '请先设置昵称' : 'Please set your nickname first');
+                return;
+            }
+            if (!requesterEmail) {
+                showToast(lang === 'zh' ? '请先填写公司邮箱，方便捐书人联系你' : 'Please enter your email first');
+                document.getElementById('userEmail').focus();
+                return;
+            }
+
+            const books = getBooks();
+            const bookId = window._currentBookId;
+            const book = books.find(b => b.id === bookId);
+            
+            if (book) {
+                book.requested = true;
+                book.requestedBy = requesterName;
+                book.requesterEmail = requesterEmail;
+                book.requestedAt = new Date().toLocaleString('zh-CN');
+                saveBooks(books);
+
+                const btn = document.querySelector('#applyModal .btn-confirm');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerText = lang === 'zh' ? '正在发送通知...' : 'Sending notification...';
+                }
+
+                const result = await sendNotification(book, requesterName, requesterEmail);
+
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = lang === 'zh' ? '确认申领，发送邮件通知' : 'Confirm Request';
+                }
+
+                if (result.success) {
+                    showToast(lang === 'zh' 
+                        ? `申领成功！已向《${book.name}》的捐书人 ${book.publisher} 发送邮件和Teams通知` 
+                        : `Request successful! Email and Teams notification sent to ${book.publisher}`);
+                } else if (result.reason === 'not_configured') {
+                    showToast(lang === 'zh'
+                        ? '申领成功！请管理员配置Power Automate Webhook以启用邮件通知'
+                        : 'Request successful! Admin needs to configure Power Automate Webhook for email notifications');
+                } else {
+                    showToast(lang === 'zh'
+                        ? '申领成功，但通知发送失败。请手动联系捐书人：' + (book.publisherEmail || book.publisher)
+                        : 'Request successful, but notification failed. Please contact the publisher manually.');
+                }
+            }
+            
+            hideApplyModal();
+            renderBooks();
+            updateMyCounts();
+        }
+
+        function cancelRequest(bookId) {
+            const lang = document.getElementById('langSelect').value;
+            const books = getBooks();
+            const book = books.find(b => b.id === bookId);
+
+            if (!book) return;
+
+            if (book.requestedBy !== getCurrentUser()) {
+                showToast(lang === 'zh' ? '只有申领人才能取消申领' : 'Only the requester can cancel the request');
+                return;
+            }
+
+            if (confirm(lang === 'zh'
+                ? `确定取消申领《${book.name}》吗？\n取消后该书将重新变为可申领状态。`
+                : `Cancel your request for "${book.name}"?\nThe book will become available again.`)) {
+
+                book.requested = false;
+                book.requestedBy = null;
+                book.requesterEmail = null;
+                book.requestedAt = null;
+                saveBooks(books);
+
+                showToast(lang === 'zh' ? '已取消申领' : 'Request cancelled');
+                renderBooks();
+                updateMyCounts();
+            }
+        }
+
+        let editImageData = null;
+
+        function showEditModal(bookId) {
+            const books = getBooks();
+            const book = books.find(b => b.id === bookId);
+            if (!book) return;
+            
+            if (book.publisher !== getCurrentUser()) {
+                showToast('只能编辑自己发布的书籍');
+                return;
+            }
+            
+            document.getElementById('editBookName').value = book.name;
+            document.getElementById('editBookAuthor').value = book.author;
+            document.getElementById('editBookCategory').value = book.category;
+            document.getElementById('editBookCity').value = book.city || '';
+            document.getElementById('editBookCondition').value = book.condition;
+            document.getElementById('editBookDesc').value = book.desc || '';
+            
+            const previewImg = document.getElementById('editPreviewImg');
+            if (book.image) {
+                previewImg.src = book.image;
+                previewImg.style.display = 'block';
+                editImageData = book.image;
+            } else {
+                previewImg.style.display = 'none';
+                editImageData = null;
+            }
+            
+            document.getElementById('editBookImage').value = '';
+            document.getElementById('editModal').classList.add('show');
+            window._editBookId = bookId;
+        }
+
+        function hideEditModal() {
+            document.getElementById('editModal').classList.remove('show');
+            editImageData = null;
+        }
+
+        function handleEditImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    editImageData = e.target.result;
+                    const previewImg = document.getElementById('editPreviewImg');
+                    previewImg.src = editImageData;
+                    previewImg.style.display = 'block';
+                    showToast('图片已更新');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function submitEdit() {
+            const name = document.getElementById('editBookName').value.trim();
+            const author = document.getElementById('editBookAuthor').value.trim();
+            const category = document.getElementById('editBookCategory').value;
+            const city = document.getElementById('editBookCity').value;
+            const condition = document.getElementById('editBookCondition').value;
+            const desc = document.getElementById('editBookDesc').value.trim();
+
+            if (!name) { showToast('请输入书籍名称'); return; }
+            if (!author) { showToast('请输入作者'); return; }
+            if (!category) { showToast('请选择分类'); return; }
+            if (!city) { showToast('请选择所在城市'); return; }
+
+            const books = getBooks();
+            const bookId = window._editBookId;
+            const book = books.find(b => b.id === bookId);
+            
+            if (book) {
+                book.name = name;
+                book.author = author;
+                book.category = category;
+                book.city = city;
+                book.publisherCity = city;
+                book.condition = condition;
+                book.desc = desc;
+                book.publisherEmail = getCurrentUserEmail();
+                if (editImageData !== null) {
+                    book.image = editImageData;
+                }
+                book.updatedAt = new Date().toLocaleString('zh-CN');
+                saveBooks(books);
+            }
+            
+            showToast('修改已保存！');
+            hideEditModal();
+            renderBooks();
+        }
+
+        function deleteBook(bookId) {
+            const books = getBooks();
+            const book = books.find(b => b.id === bookId);
+            if (!book) return;
+            
+            if (book.publisher !== getCurrentUser()) {
+                showToast('只能删除自己发布的书籍');
+                return;
+            }
+            
+            if (confirm(`确定要删除《${book.name}》吗？`)) {
+                const newBooks = books.filter(b => b.id !== bookId);
+                saveBooks(newBooks);
+                showToast('书籍已删除');
+                renderBooks();
+                updateMyCounts();
+            }
+        }
+
+        const translations = {
+            zh: {
+                logo: '内部图书共享平台',
+                home: '首页',
+                bookList: '全部书单',
+                publish: '我要捐书',
+                mine: '个人中心',
+                rule: '平台规则',
+                searchPlaceholder: '搜索书名/作者',
+                selectCity: '选择城市',
+                beijing: '北京',
+                shanghai: '上海',
+                suzhou: '苏州',
+                guangzhou: '广州',
+                chengdu: '成都',
+                shenzhen: '深圳',
+                chinese: '中文',
+                english: 'English',
+                bannerTitle: '闲置图书 · 内部共享',
+                bannerDesc: '将闲置书籍赠与同事，以书会友，循环共享知识。申领书籍后，系统将自动向发布者发送邮件提醒，双方线下自主对接交接。',
+                bannerBtn: '立即捐书上架',
+                allBooks: '全部书籍',
+                career: '职场成长',
+                literature: '文学小说',
+                social: '社科历史',
+                parenting: '育儿生活',
+                skills: '工具技能',
+                latestBooks: '最新上架书籍',
+                emptyTips: '暂无上架图书，快去发布闲置书籍吧',
+                publishTitle: '我要发布闲置书籍',
+                bookName: '书籍名称',
+                author: '作者',
+                bookCategory: '书籍分类',
+                selectCategory: '请选择分类',
+                bookCity: '所在城市',
+                selectCityOption: '请选择城市',
+                bookCondition: '书籍品相',
+                brandNew: '全新未翻阅',
+                likeNew: '九成新（轻微翻阅）',
+                good: '八成新（少量笔记）',
+                fair: '七成新（正常磨损）',
+                bookDesc: '书籍简介/赠书说明',
+                bookDescPlaceholder: '简单介绍书籍内容、阅读感受或赠书须知',
+                uploadImg: '上传书籍实拍图',
+                uploadTips: '点击或拖拽图片至此上传',
+                submit: '提交上架',
+                myCenter: '个人中心',
+                myBooks: '我发布的书籍',
+                viewAll: '查看全部 >',
+                requestedBooks: '我申领的书籍',
+                viewRecords: '查看记录 >',
+                pendingBooks: '待对接书籍',
+                viewMessages: '查看消息 >',
+                rulesTitle: '平台使用规则',
+                rule1: '1、本平台为公司内部员工专属公益图书共享平台，所有书籍均为免费赠与、无交易、无收费。',
+                rule2: '2、员工可自主上架个人闲置正版书籍，如实填写书籍品相与信息，禁止上架盗版、破损严重、非正规书籍。',
+                rule3: '3、申领书籍后，系统将自动向书籍发布者发送邮件通知，双方请及时线下对接，完成书籍交接。',
+                rule4: '4、请文明共享、诚信申领，申领书籍后请勿无故弃领，珍惜同事分享的书籍资源。',
+                rule5: '5、平台仅提供展示与通知服务，书籍交接、阅读使用由双方自主沟通负责。',
+                footer: '内部图书共享平台 © 2026 仅供公司内部员工交流使用',
+                modalTitle: '申领书籍',
+                cancel: '取消',
+                confirm: '确认申领，发送邮件通知',
+                applySuccess: '申领成功！已向【{name}】发送邮件通知，等待对方对接即可~',
+                applyDesc: '您即将申领 {publisher} 分享的书籍，确认后将自动向对方发送邮件提醒。'
+            },
+            en: {
+                logo: 'Internal Book Sharing',
+                home: 'Home',
+                bookList: 'All Books',
+                publish: 'Donate Book',
+                mine: 'My Center',
+                rule: 'Rules',
+                searchPlaceholder: 'Search book title/author',
+                selectCity: 'Select City',
+                beijing: 'Beijing',
+                shanghai: 'Shanghai',
+                suzhou: 'Suzhou',
+                guangzhou: 'Guangzhou',
+                chengdu: 'Chengdu',
+                shenzhen: 'Shenzhen',
+                chinese: '中文',
+                english: 'English',
+                bannerTitle: 'Idle Books · Internal Sharing',
+                bannerDesc: 'Donate idle books to colleagues, make friends through books, and share knowledge. After requesting a book, the system will automatically send an email reminder to the publisher. Both parties can connect offline for handover.',
+                bannerBtn: 'Donate Now',
+                allBooks: 'All Books',
+                career: 'Career Growth',
+                literature: 'Literature',
+                social: 'Social History',
+                parenting: 'Parenting Life',
+                skills: 'Tools & Skills',
+                latestBooks: 'Latest Books',
+                emptyTips: 'No books available yet. Go publish your idle books!',
+                publishTitle: 'Publish Idle Book',
+                bookName: 'Book Title',
+                author: 'Author',
+                bookCategory: 'Category',
+                selectCategory: 'Select Category',
+                bookCity: 'City',
+                selectCityOption: 'Select City',
+                beijing: 'Beijing',
+                shanghai: 'Shanghai',
+                suzhou: 'Suzhou',
+                guangzhou: 'Guangzhou',
+                chengdu: 'Chengdu',
+                shenzhen: 'Shenzhen',
+                bookCondition: 'Condition',
+                brandNew: 'Brand New',
+                likeNew: 'Like New (Slightly Read)',
+                good: 'Good (Few Notes)',
+                fair: 'Fair (Normal Wear)',
+                bookDesc: 'Book Description',
+                bookDescPlaceholder: 'Briefly describe the book content, reading experience or donation notes',
+                uploadImg: 'Upload Book Photo',
+                uploadTips: 'Click or drag image to upload',
+                submit: 'Submit',
+                myCenter: 'My Center',
+                myBooks: 'My Published Books',
+                viewAll: 'View All >',
+                requestedBooks: 'My Requests',
+                viewRecords: 'View Records >',
+                pendingBooks: 'Pending Handover',
+                viewMessages: 'View Messages >',
+                rulesTitle: 'Platform Rules',
+                rule1: '1. This platform is an internal public welfare book sharing platform for employees. All books are donated for free, no transactions or fees.',
+                rule2: '2. Employees can publish their idle genuine books, fill in the condition and information truthfully. Pirated, damaged or non-standard books are prohibited.',
+                rule3: '3. After requesting a book, the system will automatically send an email notification to the publisher. Both parties should connect offline promptly to complete the handover.',
+                rule4: '4. Please share politely and request honestly. Do not abandon requested books without reason. Cherish the book resources shared by colleagues.',
+                rule5: '5. The platform only provides display and notification services. Book handover and reading are the responsibility of both parties.',
+                footer: 'Internal Book Sharing © 2026 For internal employee communication only',
+                modalTitle: 'Request Book',
+                cancel: 'Cancel',
+                confirm: 'Confirm Request, Send Email',
+                applySuccess: 'Request successful! Email sent to [{name}], waiting for their response~',
+                applyDesc: 'You are about to request the book shared by {publisher}. Confirm to automatically send an email reminder.'
+            }
+        };
+
+        function updateLanguage(lang) {
+            const trans = translations[lang];
+            document.querySelector('.logo').innerText = trans.logo;
+            document.querySelectorAll('.nav-list a')[0].innerText = trans.home;
+            document.querySelectorAll('.nav-list a')[1].innerText = trans.bookList;
+            document.querySelectorAll('.nav-list a')[2].innerText = trans.publish;
+            document.querySelectorAll('.nav-list a')[3].innerText = trans.mine;
+            document.querySelectorAll('.nav-list a')[4].innerText = trans.rule;
+            document.querySelector('#searchInput').placeholder = trans.searchPlaceholder;
+            document.querySelector('#citySelect option[value=""]').innerText = trans.selectCity;
+            document.querySelector('#citySelect option[value="beijing"]').innerText = trans.beijing;
+            document.querySelector('#citySelect option[value="shanghai"]').innerText = trans.shanghai;
+            document.querySelector('#citySelect option[value="suzhou"]').innerText = trans.suzhou;
+            document.querySelector('#citySelect option[value="guangzhou"]').innerText = trans.guangzhou;
+            document.querySelector('#citySelect option[value="chengdu"]').innerText = trans.chengdu;
+            document.querySelector('#citySelect option[value="shenzhen"]').innerText = trans.shenzhen;
+            document.querySelector('#langSelect option[value="zh"]').innerText = trans.chinese;
+            document.querySelector('#langSelect option[value="en"]').innerText = trans.english;
+            document.querySelector('#userName').placeholder = lang === 'zh' ? '你的昵称' : 'Your Nickname';
+            document.querySelector('.banner h2').innerText = trans.bannerTitle;
+            document.querySelector('.banner p').innerText = trans.bannerDesc;
+            document.querySelector('.banner .btn-primary').innerText = trans.bannerBtn;
+            document.querySelectorAll('#cateList button')[0].innerText = trans.allBooks;
+            document.querySelectorAll('#cateList button')[1].innerText = trans.career;
+            document.querySelectorAll('#cateList button')[2].innerText = trans.literature;
+            document.querySelectorAll('#cateList button')[3].innerText = trans.social;
+            document.querySelectorAll('#cateList button')[4].innerText = trans.parenting;
+            document.querySelectorAll('#cateList button')[5].innerText = trans.skills;
+            document.querySelectorAll('.section-title')[0].lastChild.textContent = trans.latestBooks;
+            document.querySelectorAll('.section-title')[1].lastChild.textContent = trans.publishTitle;
+            document.querySelectorAll('.form-item label')[0].innerHTML = trans.bookName + ' <span style="color:red">*</span>';
+            document.querySelectorAll('.form-item label')[1].innerHTML = trans.author + ' <span style="color:red">*</span>';
+            document.querySelectorAll('.form-item label')[2].innerHTML = trans.bookCategory + ' <span style="color:red">*</span>';
+            document.querySelectorAll('.form-item select')[0].options[0].text = trans.selectCategory;
+            document.querySelectorAll('.form-item select')[0].options[1].text = trans.career;
+            document.querySelectorAll('.form-item select')[0].options[2].text = trans.literature;
+            document.querySelectorAll('.form-item select')[0].options[3].text = trans.social;
+            document.querySelectorAll('.form-item select')[0].options[4].text = trans.parenting;
+            document.querySelectorAll('.form-item select')[0].options[5].text = trans.skills;
+            document.querySelectorAll('.form-item label')[3].innerHTML = trans.bookCity + ' <span style="color:red">*</span>';
+            document.querySelectorAll('.form-item select')[1].options[0].text = trans.selectCityOption;
+            document.querySelectorAll('.form-item select')[1].options[1].text = trans.beijing;
+            document.querySelectorAll('.form-item select')[1].options[2].text = trans.shanghai;
+            document.querySelectorAll('.form-item select')[1].options[3].text = trans.suzhou;
+            document.querySelectorAll('.form-item select')[1].options[4].text = trans.guangzhou;
+            document.querySelectorAll('.form-item select')[1].options[5].text = trans.chengdu;
+            document.querySelectorAll('.form-item select')[1].options[6].text = trans.shenzhen;
+            document.querySelectorAll('.form-item label')[4].innerText = trans.bookCondition;
+            document.querySelectorAll('.form-item select')[2].options[0].text = trans.brandNew;
+            document.querySelectorAll('.form-item select')[2].options[1].text = trans.likeNew;
+            document.querySelectorAll('.form-item select')[2].options[2].text = trans.good;
+            document.querySelectorAll('.form-item select')[2].options[3].text = trans.fair;
+            document.querySelectorAll('.form-item label')[5].innerText = trans.bookDesc;
+            document.querySelector('#bookDesc').placeholder = trans.bookDescPlaceholder;
+            document.querySelectorAll('.form-item label')[6].innerText = trans.uploadImg;
+            document.querySelector('.upload-box').innerText = trans.uploadTips;
+            document.querySelector('#publish .btn-primary').innerText = trans.submit;
+            document.querySelectorAll('.section-title')[2].lastChild.textContent = trans.myCenter;
+            document.querySelectorAll('.mine-item .tit')[0].innerText = trans.myBooks;
+            document.querySelectorAll('.mine-item .link')[0].innerText = trans.viewAll;
+            document.querySelectorAll('.mine-item .tit')[1].innerText = trans.requestedBooks;
+            document.querySelectorAll('.mine-item .link')[1].innerText = trans.viewRecords;
+            document.querySelectorAll('.mine-item .tit')[2].innerText = trans.pendingBooks;
+            document.querySelectorAll('.mine-item .link')[2].innerText = trans.viewMessages;
+            document.querySelectorAll('.section-title')[3].lastChild.textContent = trans.rulesTitle;
+            document.querySelectorAll('.rule-wrap p')[0].innerText = trans.rule1;
+            document.querySelectorAll('.rule-wrap p')[1].innerText = trans.rule2;
+            document.querySelectorAll('.rule-wrap p')[2].innerText = trans.rule3;
+            document.querySelectorAll('.rule-wrap p')[3].innerText = trans.rule4;
+            document.querySelectorAll('.rule-wrap p')[4].innerText = trans.rule5;
+            document.querySelector('footer').innerText = trans.footer;
+            document.querySelector('.btn-cancel').innerText = trans.cancel;
+            document.querySelector('.btn-confirm').innerText = trans.confirm;
+            localStorage.setItem('currentLang', lang);
+            renderBooks();
+        }
+
+        function handleCityChange() {
+            const city = document.getElementById('citySelect').value;
+            const cityNames = {
+                beijing: '北京',
+                shanghai: '上海',
+                suzhou: '苏州',
+                guangzhou: '广州',
+                chengdu: '成都',
+                shenzhen: '深圳'
+            };
+            if (city) {
+                localStorage.setItem('selectedCity', city);
+                showToast(`已选择城市：${cityNames[city]}`);
+            }
+        }
+
+        document.getElementById('langSelect').addEventListener('change', function() {
+            updateLanguage(this.value);
+        });
+
+        document.getElementById('citySelect').addEventListener('change', handleCityChange);
+
+        document.querySelectorAll('#cateList button').forEach(btn => {
+            btn.addEventListener('click', () => handleCategoryClick(btn));
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedLang = localStorage.getItem('currentLang') || 'zh';
+            document.getElementById('langSelect').value = savedLang;
+            updateLanguage(savedLang);
+            
+            const savedCity = localStorage.getItem('selectedCity');
+            if (savedCity) {
+                document.getElementById('citySelect').value = savedCity;
+            }
+            
+            const savedName = localStorage.getItem('userName');
+            if (savedName) {
+                document.getElementById('userName').value = savedName;
+            }
+            
+            const savedEmail = localStorage.getItem('userEmail');
+            if (savedEmail) {
+                document.getElementById('userEmail').value = savedEmail;
+            }
+
+            // 清理旧数据：删除匿名者发布的书籍
+            const allBooks = getBooks();
+            const cleanBooks = allBooks.filter(b => b.publisher && b.publisher !== '匿名用户');
+            if (cleanBooks.length !== allBooks.length) {
+                saveBooks(cleanBooks);
+            }
+
+            renderBooks();
+            updateMyCounts();
+        });
+    </script>
+</body>
+</html>
