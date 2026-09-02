@@ -123,6 +123,13 @@
             .nav-list{display:none;}
         }
     </style>
+    <!-- Supabase configuration: set these meta tags to enable shared DB (leave empty to use localStorage)
+         Example: <meta name="supabase-url" content="https://xyz.supabase.co">
+                  <meta name="supabase-key" content="public-anon-key">
+    -->
+    <meta name="supabase-url" content="">
+    <meta name="supabase-key" content="">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
 <body>
     <!-- 顶部导航 -->
@@ -417,12 +424,105 @@
             }
         }
 
+        // Local cache used for rendering. It will be seeded from localStorage and optionally synced with Supabase when configured.
+        let BOOK_CACHE = JSON.parse(localStorage.getItem('books') || '[]');
+
+        // Supabase client (optional). Configure by filling the meta tags in <head> or set these values at build time.
+        const SUPABASE_URL = document.querySelector('meta[name="supabase-url"]').content || '';
+        const SUPABASE_ANON_KEY = document.querySelector('meta[name="supabase-key"]').content || '';
+        const useSupabase = SUPABASE_URL && SUPABASE_ANON_KEY;
+        let supabase = null;
+        if (useSupabase && window.supabase) {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
+
+        // Load books from Supabase into BOOK_CACHE (if configured). Falls back to localStorage.
+        async function loadBooksFromSupabase() {
+            if (!supabase) return; // no-op
+            try {
+                const { data, error } = await supabase
+                    .from('books')
+                    .select('*')
+                    .order('createdAt', { ascending: false });
+                if (error) {
+                    console.warn('Supabase load error', error);
+                    return;
+                }
+                if (data) {
+                    // normalize fields to match existing UI expectations
+                    BOOK_CACHE = data.map(d => ({
+                        id: d.id || d.book_id || Date.now(),
+                        name: d.name || '',
+                        author: d.author || '',
+                        category: d.category || '',
+                        city: d.city || '',
+                        condition: d.condition || '',
+                        desc: d.desc || '',
+                        image: d.image || null,
+                        publisher: d.publisher || '',
+                        publisherEmail: d.publisherEmail || d.publisher_email || null,
+                        publisherCity: d.publisherCity || d.publisher_city || null,
+                        createdAt: d.createdAt || d.created_at || '',
+                        requested: !!d.requested,
+                        requestedBy: d.requestedBy || d.requested_by || null,
+                        requesterEmail: d.requesterEmail || d.requester_email || null,
+                        requestedAt: d.requestedAt || d.requested_at || null
+                    }));
+                    localStorage.setItem('books', JSON.stringify(BOOK_CACHE));
+                }
+            } catch (e) {
+                console.error('loadBooksFromSupabase error', e);
+            }
+        }
+
+        // Helper: upsert a book to Supabase (insert on new, update on existing)
+        async function upsertBookToSupabase(book) {
+            if (!supabase) return;
+            try {
+                const payload = Object.assign({}, book);
+                // Supabase may expect snake_case or column names; assume table columns match keys used here.
+                const { data, error } = await supabase.from('books').upsert(payload, { onConflict: 'id' });
+                if (error) console.warn('Supabase upsert error', error);
+                return data;
+            } catch (e) {
+                console.error('upsertBookToSupabase error', e);
+            }
+        }
+
+        async function updateBookInSupabase(id, changes) {
+            if (!supabase) return;
+            try {
+                const { data, error } = await supabase.from('books').update(changes).eq('id', id);
+                if (error) console.warn('Supabase update error', error);
+                return data;
+            } catch (e) {
+                console.error('updateBookInSupabase error', e);
+            }
+        }
+
+        async function deleteBookFromSupabase(id) {
+            if (!supabase) return;
+            try {
+                const { data, error } = await supabase.from('books').delete().eq('id', id);
+                if (error) console.warn('Supabase delete error', error);
+                return data;
+            } catch (e) {
+                console.error('deleteBookFromSupabase error', e);
+            }
+        }
+
         function getBooks() {
-            return JSON.parse(localStorage.getItem('books') || '[]');
+            return BOOK_CACHE;
         }
 
         function saveBooks(books) {
+            BOOK_CACHE = books;
             localStorage.setItem('books', JSON.stringify(books));
+            // best-effort: sync recent change set to Supabase (background)
+            if (supabase) {
+                // naive approach: upsert all books (table is small for this app)
+                books.slice(0, 100).forEach(b => upsertBookToSupabase(b));
+            }
         }
 
         function getCurrentUser() {
@@ -473,7 +573,7 @@
             }
         }
 
-        function submitBook() {
+        async function submitBook() {
             const name = document.getElementById('bookName').value.trim();
             const author = document.getElementById('bookAuthor').value.trim();
             const category = document.getElementById('bookCategory').value;
@@ -508,6 +608,15 @@
             books.unshift(newBook);
             saveBooks(books);
 
+            // If Supabase configured, persist this book remotely as well
+            if (supabase) {
+                try {
+                    await upsertBookToSupabase(newBook);
+                } catch (e) {
+                    console.warn('Failed to persist book to Supabase', e);
+                }
+            }
+
             document.getElementById('bookName').value = '';
             document.getElementById('bookAuthor').value = '';
             document.getElementById('bookCategory').value = '';
@@ -520,7 +629,7 @@
             showToast('书籍上架成功！');
             renderBooks();
             updateMyCounts();
-            
+                
             setTimeout(() => {
                 document.getElementById('bookList').scrollIntoView({ behavior: 'smooth' });
             }, 500);
@@ -779,6 +888,20 @@
 
                 const result = await sendNotification(book, requesterName, requesterEmail);
 
+                // Persist request state to Supabase if available
+                if (supabase) {
+                    try {
+                        await updateBookInSupabase(book.id, {
+                            requested: true,
+                            requestedBy: requesterName,
+                            requesterEmail: requesterEmail,
+                            requestedAt: new Date().toISOString()
+                        });
+                    } catch (e) {
+                        console.warn('Failed to update request state in Supabase', e);
+                    }
+                }
+
                 if (btn) {
                     btn.disabled = false;
                     btn.innerText = lang === 'zh' ? '确认申领，发送邮件通知' : 'Confirm Request';
@@ -804,7 +927,44 @@
             updateMyCounts();
         }
 
-        function cancelRequest(bookId) {
+        // Send a notification via serverless function (Netlify/Vercel). The function should be deployed separately
+        // Environment variables required on the server: SENDGRID_API_KEY, optional FROM_EMAIL
+        async function sendNotification(book, requesterName, requesterEmail) {
+            try {
+                const payload = {
+                    bookId: book.id,
+                    bookName: book.name,
+                    publisher: book.publisher,
+                    publisherEmail: book.publisherEmail || null,
+                    requesterName,
+                    requesterEmail
+                };
+
+                const res = await fetch('/.netlify/functions/send-request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                let data = {};
+                try { data = await res.json(); } catch(e) { }
+
+                if (res.ok) {
+                    // If server returns { reason: 'not_configured' } it's still considered success (request recorded locally)
+                    if (data && data.reason === 'not_configured') return { success: true, reason: 'not_configured' };
+                    return { success: true };
+                } else {
+                    // handle specific server-side hints
+                    if (data && data.reason === 'not_configured') return { success: true, reason: 'not_configured' };
+                    return { success: false };
+                }
+            } catch (e) {
+                console.error('sendNotification error', e);
+                return { success: false };
+            }
+        }
+
+        async function cancelRequest(bookId) {
             const lang = document.getElementById('langSelect').value;
             const books = getBooks();
             const book = books.find(b => b.id === bookId);
@@ -825,6 +985,19 @@
                 book.requesterEmail = null;
                 book.requestedAt = null;
                 saveBooks(books);
+
+                if (supabase) {
+                    try {
+                        await updateBookInSupabase(book.id, {
+                            requested: false,
+                            requestedBy: null,
+                            requesterEmail: null,
+                            requestedAt: null
+                        });
+                    } catch (e) {
+                        console.warn('Failed to update request cancellation in Supabase', e);
+                    }
+                }
 
                 showToast(lang === 'zh' ? '已取消申领' : 'Request cancelled');
                 renderBooks();
@@ -886,7 +1059,7 @@
             }
         }
 
-        function submitEdit() {
+        async function submitEdit() {
             const name = document.getElementById('editBookName').value.trim();
             const author = document.getElementById('editBookAuthor').value.trim();
             const category = document.getElementById('editBookCategory').value;
@@ -917,6 +1090,14 @@
                 }
                 book.updatedAt = new Date().toLocaleString('zh-CN');
                 saveBooks(books);
+
+                if (supabase) {
+                    try {
+                        await upsertBookToSupabase(book);
+                    } catch (e) {
+                        console.warn('Failed to persist edited book to Supabase', e);
+                    }
+                }
             }
             
             showToast('修改已保存！');
@@ -924,7 +1105,7 @@
             renderBooks();
         }
 
-        function deleteBook(bookId) {
+        async function deleteBook(bookId) {
             const books = getBooks();
             const book = books.find(b => b.id === bookId);
             if (!book) return;
@@ -937,9 +1118,18 @@
             if (confirm(`确定要删除《${book.name}》吗？`)) {
                 const newBooks = books.filter(b => b.id !== bookId);
                 saveBooks(newBooks);
-                showToast('书籍已删除');
-                renderBooks();
-                updateMyCounts();
+
+            if (supabase) {
+                try {
+                    await deleteBookFromSupabase(bookId);
+                } catch (e) {
+                    console.warn('Failed to delete book from Supabase', e);
+                }
+            }
+
+            showToast('书籍已删除');
+            renderBooks();
+            updateMyCounts();
             }
         }
 
@@ -1185,7 +1375,7 @@
             btn.addEventListener('click', () => handleCategoryClick(btn));
         });
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             const savedLang = localStorage.getItem('currentLang') || 'zh';
             document.getElementById('langSelect').value = savedLang;
             updateLanguage(savedLang);
@@ -1210,6 +1400,11 @@
             const cleanBooks = allBooks.filter(b => b.publisher && b.publisher !== '匿名用户');
             if (cleanBooks.length !== allBooks.length) {
                 saveBooks(cleanBooks);
+            }
+
+            // If Supabase is configured, load remote books to replace local cache
+            if (useSupabase) {
+                await loadBooksFromSupabase();
             }
 
             renderBooks();
