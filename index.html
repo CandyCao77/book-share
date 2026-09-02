@@ -804,6 +804,43 @@
             updateMyCounts();
         }
 
+        // Send a notification via serverless function (Netlify/Vercel). The function should be deployed separately
+        // Environment variables required on the server: SENDGRID_API_KEY, optional FROM_EMAIL
+        async function sendNotification(book, requesterName, requesterEmail) {
+            try {
+                const payload = {
+                    bookId: book.id,
+                    bookName: book.name,
+                    publisher: book.publisher,
+                    publisherEmail: book.publisherEmail || null,
+                    requesterName,
+                    requesterEmail
+                };
+
+                const res = await fetch('/.netlify/functions/send-request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                let data = {};
+                try { data = await res.json(); } catch(e) { }
+
+                if (res.ok) {
+                    // If server returns { reason: 'not_configured' } it's still considered success (request recorded locally)
+                    if (data && data.reason === 'not_configured') return { success: true, reason: 'not_configured' };
+                    return { success: true };
+                } else {
+                    // handle specific server-side hints
+                    if (data && data.reason === 'not_configured') return { success: true, reason: 'not_configured' };
+                    return { success: false };
+                }
+            } catch (e) {
+                console.error('sendNotification error', e);
+                return { success: false };
+            }
+        }
+
         function cancelRequest(bookId) {
             const lang = document.getElementById('langSelect').value;
             const books = getBooks();
